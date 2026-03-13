@@ -288,6 +288,118 @@ Layout:
   Title: fontSize=24 above each zone
 ```
 
+## Geometric Thinking (Critical — For All Diagram Types)
+
+Excalidraw only offers basic primitives: rectangles, diamonds, ellipses, lines, arrows, text. Building anything beyond simple box-and-arrow diagrams requires **geometric composition** — combining many small primitives using coordinate math to form complex shapes, textures, and layouts.
+
+### Principle 1: Compose Complex Shapes from Many Small Primitives
+
+**Never use one large primitive where many small ones create a better result.**
+
+A single large diamond looks like a flat rhombus. But 45 small diamonds arranged in a triangular grid with tessellating offset rows looks like a tiled roof. The technique:
+
+1. **Identify the target shape** (triangle, circle, arc, wave, etc.)
+2. **Choose a small primitive** that can tile/fill that shape (diamond for tiles, rectangle for bricks, ellipse for clouds)
+3. **Compute a grid of positions** that fills the target shape's boundary
+4. **Apply row-by-row reduction** for tapered shapes (triangles, cones)
+5. **Add interleaving offset rows** to eliminate gaps (tessellation)
+
+```
+Example — Triangular tiled roof (building width=380, center_x=1090):
+
+Tile size: 52w × 36h
+Row spacing: 28px vertical (= tile height)
+Interleave offset: 26px horizontal (= tile width / 2)
+Interleave rows at: midpoint y between main rows
+
+Main rows (reduce by 2 tiles per row):
+  Row 1: 9 tiles at y=130  |  ◇◇◇◇◇◇◇◇◇
+  Row 2: 7 tiles at y=102  |   ◇◇◇◇◇◇◇
+  Row 3: 5 tiles at y=74   |    ◇◇◇◇◇
+  Row 4: 3 tiles at y=46   |     ◇◇◇
+  Row 5: 1 tile  at y=18   |      ◇
+
+Interleaving rows (offset by half tile width, fill gaps):
+  Inter 1: 8 tiles at y=116 |  ◇◇◇◇◇◇◇◇
+  Inter 2: 6 tiles at y=88  |   ◇◇◇◇◇◇
+  Inter 3: 4 tiles at y=60  |    ◇◇◇◇
+  Inter 4: 2 tiles at y=32  |     ◇◇
+
+Total: 45 tiles → seamless triangular roof
+```
+
+### Principle 2: Tessellation — Eliminate Gaps with Offset Rows
+
+When same-row primitives leave triangular/pointed gaps, add **interleaving rows** offset by half the primitive width:
+
+```
+Gap pattern (diamonds side-by-side):     Filled with interleaving row:
+  /\  /\  /\  /\                           /\  /\  /\  /\
+ /  \/  \/  \/  \                         /  \/  \/  \/  \
+ \  /\  /\  /\  /                         \ /\/\/\/\/\/\ /
+  \/  \/  \/  \/                           ◇◇◇◇◇◇◇◇◇  ← offset row
+                                           /\  /\  /\  /\
+```
+
+**Formula for interleaving:**
+```
+main_row_y[n] = base_y - n * row_spacing
+inter_row_y[n] = (main_row_y[n] + main_row_y[n+1]) / 2
+inter_row_x_offset = tile_width / 2
+inter_row_count = main_row_count[n] - 1
+```
+
+### Principle 3: Parametric Positioning — Use Formulas, Not Guessing
+
+Compute element positions mathematically. Common formulas:
+
+**Centering N items in a container:**
+```
+item_x[i] = container_x + (container_width - N * item_width) / (N + 1) * (i + 1) + i * item_width
+```
+
+**Circular arrangement (N items around center):**
+```
+angle[i] = (2π / N) * i + rotation_offset
+x[i] = center_x + radius * cos(angle[i]) - item_width / 2
+y[i] = center_y + radius * sin(angle[i]) - item_height / 2
+```
+
+**Triangular reduction (pyramid/roof):**
+```
+count[row] = base_count - 2 * row
+x_start[row] = center_x - (count[row] * tile_width) / 2
+y[row] = base_y - row * row_spacing
+```
+
+**Isometric projection (2.5D diagrams):**
+```
+screen_x = (grid_x - grid_y) * tile_width / 2
+screen_y = (grid_x + grid_y) * tile_height / 2
+```
+
+### Principle 4: Scale Primitives to Context
+
+When applying a technique to different-sized containers, **scale the primitive size proportionally**:
+
+```
+Hut (body width 290px)  → tiles 40w × 28h, 9 per base row
+Building (body width 380px) → tiles 52w × 36h, 9 per base row
+```
+
+Maintain the same count-per-row for visual consistency; adjust individual tile dimensions.
+
+### Technique Catalogs
+
+For detailed recipes and formulas for specific diagram types, see [geometric-thinking.md](references/geometric-thinking.md):
+
+- **Illustrative diagrams**: 11 visual element recipes (roofs, walls, clouds, trees, fences, water, smoke, windows, stairs)
+- **Flow diagrams**: Sugiyama-inspired 4-step hierarchical layout (layer assignment → ordering → coordinates → edge routing)
+- **Architecture diagrams**: Zone-grid layout with service grid-packing and dependency layering
+- **Isometric/2.5D diagrams**: Screen projection formulas for depth illusion
+- **Repeating patterns**: Generic repeat and brick-pattern offset formulas
+- **Anti-patterns**: 6 common geometric composition mistakes and fixes
+
 ## Workflow: Iterative Refinement
 
 ```
@@ -303,55 +415,18 @@ create shapes (batch 1)
 
 For multi-diagram canvases, offset each new diagram by 300px+ from the previous one's bounding box.
 
-## Workflow: Multi-Tenancy (Workspaces)
+## Workflow: Tenants, Projects & Search
 
-The MCP is multi-tenant. Each Cursor workspace automatically gets its own tenant (identified by a SHA-256 hash of the workspace path). All elements, projects, and snapshots are scoped to the active tenant.
-
-### Automatic Tenant Detection
-
-On MCP startup, the server:
-1. Creates a tenant from `process.cwd()` (initial guess)
-2. After connecting, calls `server.listRoots()` to get the real workspace path from Cursor
-3. If different, re-creates/switches to the correct tenant and notifies the canvas
-
-This means globally-configured MCPs (`~/.cursor/mcp.json`) correctly detect the per-window workspace — no manual setup needed.
-
-### Tenant Operations
+Multi-tenant: each Cursor workspace auto-gets its own tenant (SHA-256 hash of workspace path). Globally-configured MCPs detect per-window workspace automatically.
 
 | Task | Tool | Notes |
 |------|------|-------|
-| See all workspaces | `list_tenants` | Returns id, name, workspace_path, created_at |
-| Switch workspace | `switch_tenant` with `tenantId` | Canvas reloads that tenant's elements via WebSocket |
-| Check current tenant | (from describe_scene or frontend header) | Shows "Workspace: [name]" in canvas |
-
-### Multiple Cursor Instances
-
-Each instance sends its own `X-Tenant-Id` header on every HTTP/MCP request. SQLite uses `busy_timeout` for concurrent write safety. No state conflicts between windows.
-
-## Workflow: Projects (Within a Tenant)
-
-Projects group diagrams within a tenant. Each tenant has a "Default Project" created automatically. Use projects to organize different diagram sets (e.g., "Architecture", "User Flows", "Sprint Planning").
-
-| Task | Tool | Notes |
-|------|------|-------|
-| List projects | `list_projects` | Shows all projects in active tenant |
-| Switch project | `switch_project` with `projectId` | Elements change to that project's set |
-| Create new project | `switch_project` with `createName` | Creates and switches in one call |
-
-## Workflow: Search & History
-
-### Full-Text Search
-
-`search_elements` with `query` — searches across element labels and text content in the active project. Useful for finding specific elements in large diagrams.
-
-### Element Version History
-
-`element_history` — view create/update/delete operations for:
-- A specific element: pass `elementId`
-- Entire active project: omit `elementId`
-- Control result count with `limit` (default 50)
-
-Use history to debug unexpected changes or audit what was modified.
+| List workspaces | `list_tenants` | Returns id, name, workspace_path |
+| Switch workspace | `switch_tenant` with `tenantId` | Canvas reloads tenant's elements |
+| List projects | `list_projects` | Projects group diagrams within a tenant |
+| Switch/create project | `switch_project` | Pass `projectId` or `createName` |
+| Full-text search | `search_elements` with `query` | Searches labels and text content |
+| Version history | `element_history` | Pass `elementId` or omit for project-wide |
 
 ## Workflow: Refine An Existing Diagram
 
