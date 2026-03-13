@@ -1091,9 +1091,33 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
 const PORT = parseInt(process.env.CANVAS_PORT || process.env.PORT || '3000', 10);
 const HOST = process.env.HOST || 'localhost';
 
-export function startCanvasServer(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const onError = (err: Error) => {
+/** Track whether we own the canvas server or are reusing an existing one. */
+let canvasServerOwned = false;
+
+export function isCanvasServerOwned(): boolean {
+  return canvasServerOwned;
+}
+
+export async function startCanvasServer(): Promise<void> {
+  // Pre-flight: check if an existing healthy canvas server is already on this port.
+  // We do this BEFORE calling httpServer.listen() because Node's listen() can emit
+  // EADDRINUSE as an uncaught exception that bypasses our error handler.
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+    const res = await fetch(`http://${HOST}:${PORT}/health`, { signal: controller.signal as any });
+    clearTimeout(timeout);
+    const body = await res.json() as any;
+    if (body?.status === 'healthy') {
+      logger.info(`Reusing existing canvas server on port ${PORT} (elements: ${body.elements_count}, ws clients: ${body.websocket_clients})`);
+      return; // reuse — skip listen entirely
+    }
+  } catch {
+    // No server on this port (connection refused) or not a canvas server — proceed to start our own
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    const onError = (err: NodeJS.ErrnoException) => {
       httpServer.removeListener('error', onError);
       reject(err);
     };
@@ -1101,14 +1125,19 @@ export function startCanvasServer(): Promise<void> {
 
     httpServer.listen(PORT, HOST, () => {
       httpServer.removeListener('error', onError);
-      logger.info(`Canvas server running on http://${HOST}:${PORT}`);
-      logger.info(`WebSocket server running on ws://${HOST}:${PORT}`);
       resolve();
     });
   });
+  canvasServerOwned = true;
+  logger.info(`Canvas server running on http://${HOST}:${PORT}`);
+  logger.info(`WebSocket server running on ws://${HOST}:${PORT}`);
 }
 
 export function stopCanvasServer(): Promise<void> {
+  if (!canvasServerOwned) {
+    logger.info('Canvas server not owned by this process, skipping shutdown');
+    return Promise.resolve();
+  }
   return new Promise((resolve) => {
     clients.forEach(c => c.close());
     httpServer.close(() => resolve());

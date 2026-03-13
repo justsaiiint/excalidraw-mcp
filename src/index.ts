@@ -2508,7 +2508,13 @@ async function runServer(): Promise<void> {
 }
 
 // Add global error handlers
-process.on('uncaughtException', (error: Error) => {
+process.on('uncaughtException', (error: Error & { code?: string }) => {
+  // EADDRINUSE from the canvas server is handled gracefully in startCanvasServer —
+  // don't let a stray emit from httpServer kill the entire MCP process.
+  if (error.code === 'EADDRINUSE') {
+    logger.warn('Ignoring EADDRINUSE in global handler (canvas server will reuse existing instance)');
+    return;
+  }
   logger.error('Uncaught exception:', error);
   process.stderr.write(`UNCAUGHT EXCEPTION: ${error.message}\n${error.stack}\n`);
   setTimeout(() => process.exit(1), 1000);
