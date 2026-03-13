@@ -91,26 +91,18 @@ jobs:
           FIXES=$(echo "$SUBJECTS" | grep -iE "^(fix|🐛)" || true)
           OTHERS=$(echo "$SUBJECTS" | grep -viE "^(feat|feature|✨|fix|🐛|chore\(release\))" | grep -viE "BREAKING" || true)
 
-          if [ -n "$BREAKING" ]; then
-            CHANGELOG="${CHANGELOG}
-### ⚠️ Breaking Changes
-$(echo "$BREAKING" | sed 's/^/- /')"
-          fi
-          if [ -n "$FEATURES" ]; then
-            CHANGELOG="${CHANGELOG}
-### ✨ Features
-$(echo "$FEATURES" | sed 's/^/- /')"
-          fi
-          if [ -n "$FIXES" ]; then
-            CHANGELOG="${CHANGELOG}
-### 🐛 Bug Fixes
-$(echo "$FIXES" | sed 's/^/- /')"
-          fi
-          if [ -n "$OTHERS" ]; then
-            CHANGELOG="${CHANGELOG}
-### 📦 Other Changes
-$(echo "$OTHERS" | sed 's/^/- /')"
-          fi
+          add_section() {
+            local header="$1"
+            local items="$2"
+            if [ -n "$items" ]; then
+              CHANGELOG="$(printf '%s\n\n%s\n%s' "$CHANGELOG" "$header" "$(echo "$items" | sed 's/^/- /')")"
+            fi
+          }
+
+          add_section "### ⚠️ Breaking Changes" "$BREAKING"
+          add_section "### ✨ Features" "$FEATURES"
+          add_section "### 🐛 Bug Fixes" "$FIXES"
+          add_section "### 📦 Other Changes" "$OTHERS"
 
           echo "bump=$BUMP" >> "$GITHUB_OUTPUT"
           echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
