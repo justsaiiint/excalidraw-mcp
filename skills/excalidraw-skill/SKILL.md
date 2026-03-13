@@ -1,6 +1,6 @@
 ---
 name: excalidraw-skill
-description: Programmatic canvas toolkit for creating, editing, and refining Excalidraw diagrams via MCP tools (32 tools) or REST API with real-time canvas sync, multi-tenant workspace isolation, SQLite persistence, project management, full-text search, and element version history. Use when an agent needs to draw or lay out diagrams on a live canvas, iteratively refine diagrams using screenshots, manage workspaces/tenants and projects, export/import .excalidraw files or PNG/SVG images, search elements, view change history, save/restore canvas snapshots, or perform element-level CRUD. Canvas server port is configurable via CANVAS_PORT env var (default 3000).
+description: MANDATORY prerequisite for ALL Excalidraw MCP tool usage. Read this skill BEFORE calling any Excalidraw tool (batch_create_elements, create_element, create_from_mermaid, update_element, etc.) — without this skill's sizing formulas, two-batch ordering (shapes first, arrows second), and write-check-review verification cycle, diagrams will have invisible arrows, truncated text, and overlapping elements. Use whenever the user asks to draw, create, visualize, sketch, or diagram anything — flowcharts, architecture diagrams, system designs, org charts, sequence flows, decision trees, network topologies, ER diagrams, mind maps, or any visual on Excalidraw canvas. Also covers diagram refinement, PNG/SVG export, project/workspace management, and all canvas interactions.
 ---
 
 # Excalidraw Skill

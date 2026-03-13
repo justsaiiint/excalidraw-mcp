@@ -57,6 +57,11 @@ interface AgentDef {
   mcpConfigPath?: string;
   mcpCliRemove?: string;
   mcpCliCommand?: string;
+  instructionConfig?: {
+    global: string;
+    local: string;
+    format: 'claude-md' | 'cursor-mdc';
+  };
 }
 
 function getAgents(): AgentDef[] {
@@ -71,6 +76,11 @@ function getAgents(): AgentDef[] {
       },
       mcpConfigType: 'json-file',
       mcpConfigPath: path.join(home, '.cursor', 'mcp.json'),
+      instructionConfig: {
+        global: path.join(home, '.cursor', 'rules', 'excalidraw.mdc'),
+        local: path.join(process.cwd(), '.cursor', 'rules', 'excalidraw.mdc'),
+        format: 'cursor-mdc',
+      },
     },
     {
       name: 'Claude Code',
@@ -82,6 +92,11 @@ function getAgents(): AgentDef[] {
       mcpConfigType: 'cli-command',
       mcpCliRemove: 'claude mcp remove excalidraw-canvas --scope user',
       mcpCliCommand: 'claude mcp add excalidraw-canvas --scope user -e CANVAS_PORT=3000 -- npx -y @sanjibdevnath/mcp-excalidraw-local@latest',
+      instructionConfig: {
+        global: path.join(home, '.claude', 'CLAUDE.md'),
+        local: path.join(process.cwd(), 'CLAUDE.md'),
+        format: 'claude-md',
+      },
     },
     {
       name: 'Codex CLI',
@@ -226,6 +241,17 @@ async function phaseSkillInstall(rl: readline.Interface): Promise<void> {
       fs.mkdirSync(destDir, { recursive: true });
       copyDirSync(skillSource, destDir);
       ok(`Installed to ${destDir}`);
+
+      // Write instruction directive to ensure skill auto-triggers
+      if (agent.instructionConfig) {
+        const instrPath = agent.instructionConfig[scope];
+        try {
+          writeInstructionDirective(instrPath, agent.instructionConfig.format);
+          ok(`Skill directive added to ${instrPath}`);
+        } catch (instrErr) {
+          warn(`Could not write directive to ${instrPath}: ${(instrErr as Error).message}`);
+        }
+      }
     } catch (err) {
       fail(`Failed to install to ${destDir}: ${(err as Error).message}`);
     }
@@ -243,6 +269,79 @@ function copyDirSync(src: string, dest: string): void {
       fs.copyFileSync(srcPath, destPath);
     }
   }
+}
+
+// ── Instruction Directives ──────────────────────────────────
+
+const DIRECTIVE_MARKER_START = '<!-- excalidraw-mcp:start -->';
+const DIRECTIVE_MARKER_END = '<!-- excalidraw-mcp:end -->';
+
+const EXCALIDRAW_DIRECTIVE_BODY =
+  'When Excalidraw MCP tools are available (batch_create_elements, create_element, ' +
+  'create_from_mermaid, etc.), ALWAYS invoke the `/excalidraw-skill` skill FIRST ' +
+  'before calling any Excalidraw tool. The skill contains essential sizing formulas, ' +
+  'batch ordering rules (shapes first, arrows second), and a mandatory ' +
+  'write-check-review verification cycle. Using Excalidraw tools without consulting ' +
+  'this skill produces broken diagrams — invisible arrows, truncated text, ' +
+  'overlapping elements.';
+
+function buildClaudeMdSection(): string {
+  return [
+    DIRECTIVE_MARKER_START,
+    '## Excalidraw Canvas — Skill Directive',
+    '',
+    EXCALIDRAW_DIRECTIVE_BODY,
+    DIRECTIVE_MARKER_END,
+  ].join('\n');
+}
+
+function buildCursorMdc(): string {
+  return [
+    '---',
+    'description: Always consult excalidraw-skill before using Excalidraw MCP tools',
+    'globs:',
+    'alwaysApply: true',
+    '---',
+    '',
+    '## Excalidraw Canvas — Skill Directive',
+    '',
+    EXCALIDRAW_DIRECTIVE_BODY,
+    '',
+  ].join('\n');
+}
+
+function writeInstructionDirective(filePath: string, format: 'claude-md' | 'cursor-mdc'): void {
+  const dir = path.dirname(filePath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
+  if (format === 'cursor-mdc') {
+    // Cursor .mdc files are standalone — write/overwrite the whole file
+    fs.writeFileSync(filePath, buildCursorMdc(), 'utf-8');
+    return;
+  }
+
+  // For claude-md: append or replace the marked section
+  let content = '';
+  if (fs.existsSync(filePath)) {
+    content = fs.readFileSync(filePath, 'utf-8');
+  }
+
+  const section = buildClaudeMdSection();
+  const startIdx = content.indexOf(DIRECTIVE_MARKER_START);
+  const endIdx = content.indexOf(DIRECTIVE_MARKER_END);
+
+  if (startIdx !== -1 && endIdx !== -1) {
+    // Replace existing section
+    content = content.slice(0, startIdx) + section + content.slice(endIdx + DIRECTIVE_MARKER_END.length);
+  } else {
+    // Append with spacing
+    const trimmed = content.trimEnd();
+    content = trimmed + (trimmed ? '\n\n' : '') + section + '\n';
+  }
+
+  fs.writeFileSync(filePath, content, 'utf-8');
 }
 
 // ── Phase 3: MCP Configuration ──────────────────────────────
@@ -450,6 +549,17 @@ export async function runUpdate(): Promise<void> {
             copyDirSync(skillSource, inst.path);
             ok(`Updated ${inst.agent.name} (${inst.scope}) — ${inst.path}`);
             updated++;
+
+            // Update instruction directive
+            if (inst.agent.instructionConfig) {
+              const instrPath = inst.agent.instructionConfig[inst.scope];
+              try {
+                writeInstructionDirective(instrPath, inst.agent.instructionConfig.format);
+                ok(`Skill directive updated in ${instrPath}`);
+              } catch (instrErr) {
+                warn(`Could not update directive in ${instrPath}: ${(instrErr as Error).message}`);
+              }
+            }
           } catch (err) {
             fail(`Failed to update ${inst.path}: ${(err as Error).message}`);
           }
@@ -484,6 +594,17 @@ export async function runUpdate(): Promise<void> {
             fs.mkdirSync(destDir, { recursive: true });
             copyDirSync(skillSource, destDir);
             ok(`Installed to ${destDir}`);
+
+            // Write instruction directive
+            if (agent.instructionConfig) {
+              const instrPath = agent.instructionConfig[scope];
+              try {
+                writeInstructionDirective(instrPath, agent.instructionConfig.format);
+                ok(`Skill directive added to ${instrPath}`);
+              } catch (instrErr) {
+                warn(`Could not write directive to ${instrPath}: ${(instrErr as Error).message}`);
+              }
+            }
           } catch (err) {
             fail(`Failed to install to ${destDir}: ${(err as Error).message}`);
           }
