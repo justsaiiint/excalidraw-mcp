@@ -2903,22 +2903,12 @@ function isMainModule(): boolean {
 if (isMainModule()) {
   const arg = process.argv[2];
 
-  if (arg === 'setup') {
-    import('./setup.js').then(m => m.runSetup()).catch(error => {
-      process.stderr.write(`Setup failed: ${(error as Error).message}\n`);
-      process.exit(1);
-    });
-  } else if (arg === 'update') {
-    import('./setup.js').then(m => m.runUpdate()).catch(error => {
-      process.stderr.write(`Update failed: ${(error as Error).message}\n`);
-      process.exit(1);
-    });
-  } else if (arg === '--help' || arg === '-h' || arg === '--version' || arg === '-v') {
+  if (arg === '--help' || arg === '-h' || arg === '--version' || arg === '-v') {
     const pkgPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'package.json');
     try {
       const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
       if (arg === '--help' || arg === '-h') {
-        process.stdout.write(`${pkg.name} v${pkg.version}\n\nUsage:\n  mcp-excalidraw-local          Start MCP server (stdio transport)\n  mcp-excalidraw-local setup     Interactive setup wizard\n  mcp-excalidraw-local update    Update agent skills and MCP config\n  mcp-excalidraw-local --help    Show this help\n  mcp-excalidraw-local --version Show version\n`);
+        process.stdout.write(`${pkg.name} v${pkg.version}\n\nUsage:\n  excalidraw-mcp          Start MCP server (stdio)\n  excalidraw-mcp --help   Show help\n  excalidraw-mcp --version Show version\n`);
       } else {
         process.stdout.write(`${pkg.version}\n`);
       }

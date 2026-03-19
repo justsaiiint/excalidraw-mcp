@@ -1,11 +1,11 @@
 {
-  "name": "@sanjibdevnath/mcp-excalidraw-local",
+  "name": "excalidraw-mcp",
   "version": "1.6.2",
   "description": "Fully local MCP server for Excalidraw with SQLite persistence, multi-tenancy, auto-sync, real-time canvas, and 32 tools",
   "main": "dist/index.js",
   "type": "module",
   "bin": {
-    "mcp-excalidraw-local": "dist/index.js"
+    "excalidraw-mcp": "dist/index.js"
   },
   "scripts": {
     "start": "npm run build:server && node dist/index.js",
@@ -18,9 +18,7 @@
     "dev:server": "npx tsc --watch",
     "production": "npm run build && npm run canvas",
     "prepublishOnly": "npm run build",
-    "setup": "node dist/index.js setup",
-    "update": "node dist/index.js update",
-    "type-check": "npx tsc --noEmit",
+"type-check": "npx tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:unit": "vitest run tests/backend/db.test.ts tests/frontend/helpers.test.ts",
@@ -94,11 +92,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/sanjibdevnathlabs/mcp-excalidraw-local.git"
+    "url": "https://github.com/justsaiiint/excalidraw-mcp.git"
   },
-  "homepage": "https://github.com/sanjibdevnathlabs/mcp-excalidraw-local#readme",
+  "homepage": "https://github.com/justsaiiint/excalidraw-mcp#readme",
   "bugs": {
-    "url": "https://github.com/sanjibdevnathlabs/mcp-excalidraw-local/issues"
+    "url": "https://github.com/justsaiiint/excalidraw-mcp/issues"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -115,7 +113,6 @@
   },
   "files": [
     "dist/**/*",
-    "skills/**/*",
     "README.md",
     "LICENSE"
   ]
