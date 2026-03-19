@@ -452,19 +452,23 @@ function App(): JSX.Element {
           if (data.elements) {
             const cleanedBatchElements = data.elements.map(cleanElementForExcalidraw)
             const hasBoundArrows = cleanedBatchElements.some((el: any) => el.start || el.end)
+            // Use IMMEDIATELY_ALL so bound text sub-elements created by
+            // convertToExcalidrawElements are properly registered by Excalidraw.
+            // CaptureUpdateAction.NEVER caused labels to vanish on next reconciliation.
+            const captureAction = CaptureUpdateAction.IMMEDIATELY_ALL
             if (hasBoundArrows) {
               const allElements = [...currentElements, ...cleanedBatchElements] as any[]
               const convertedAll = convertElementsPreservingImageProps(allElements)
               api.updateScene({
                 elements: convertedAll,
-                captureUpdate: CaptureUpdateAction.NEVER
+                captureUpdate: captureAction
               })
             } else {
               const batchElements = convertElementsPreservingImageProps(cleanedBatchElements)
               const updatedElementsAfterBatch = [...currentElements, ...batchElements]
               api.updateScene({
                 elements: updatedElementsAfterBatch,
-                captureUpdate: CaptureUpdateAction.NEVER
+                captureUpdate: captureAction
               })
             }
             // Verify elements landed in the scene
