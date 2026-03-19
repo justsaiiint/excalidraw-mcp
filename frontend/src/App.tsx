@@ -949,18 +949,19 @@ function App(): JSX.Element {
           if (api) {
             const scene = api.getSceneElements()
             let merged = [...scene]
+            // Build set of IDs already in the scene (including bound text elements)
+            const sceneIds = new Set(scene.map(el => el.id))
             for (const sc of result.serverChanges) {
               if (sc.action === 'delete') {
                 merged = merged.filter(el => el.id !== sc.id)
               } else if (sc.element) {
+                // Skip elements already in the scene — they were applied via
+                // WebSocket and re-converting them destroys bound text bindings.
+                if (sceneIds.has(sc.element.id)) continue
                 const cleaned = cleanElementForExcalidraw(sc.element)
-                const converted = convertToExcalidrawElements([cleaned], { regenerateIds: false })
-                const idx = merged.findIndex(el => el.id === sc.id)
-                if (idx >= 0) {
-                  merged[idx] = converted[0]!
-                } else {
-                  merged.push(...converted)
-                }
+                const allForConvert = [...merged, cleaned] as any[]
+                const converted = convertElementsPreservingImageProps(allForConvert)
+                merged = converted
               }
             }
             api.updateScene({ elements: merged, captureUpdate: CaptureUpdateAction.NEVER })
